@@ -13,6 +13,7 @@ export default function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     { id: 'portfolio', icon: BarChart3, label: 'Portfolio' },
   ];
 
+  
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-inset-bottom z-50">
       <div className="grid grid-cols-4 h-16">
