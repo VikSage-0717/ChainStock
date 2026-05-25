@@ -7,7 +7,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { Brain, Sparkles } from 'lucide-react-native';
+// Use simple emoji for icons to avoid external icon package issues on web
 import { getDashboardAssets, getAssetPrediction } from '../utils/api';
 
 interface PredictionItem {
@@ -18,6 +18,7 @@ interface PredictionItem {
   confidence: number;
   timeframe: string;
   trend: 'bullish' | 'bearish' | 'neutral';
+  sentimentScore?: number;
 }
 
 export default function PredictionsScreen() {
@@ -59,6 +60,7 @@ export default function PredictionsScreen() {
                   confidence: selectedPred.confidence || 65,
                   timeframe: selectedTimeframe,
                   trend: selectedPred.trend || 'neutral',
+                  sentimentScore: pred.sentimentScore,
                 });
               }
             }
@@ -147,6 +149,17 @@ export default function PredictionsScreen() {
             >
               {item.name}
             </Text>
+            {item.sentimentScore !== undefined && (
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: '#9ca3af',
+                  marginTop: 4,
+                }}
+              >
+                Sentiment: {item.sentimentScore}% {item.sentimentScore > 60 ? '📈' : item.sentimentScore < 40 ? '📉' : '➡️'}
+              </Text>
+            )}
           </View>
           <View
             style={{
@@ -310,7 +323,7 @@ export default function PredictionsScreen() {
         paddingHorizontal: 16,
       }}
     >
-      <Sparkles size={48} color="#d1d5db" style={{ marginBottom: 16 }} />
+      <Text style={{ fontSize: 48, marginBottom: 16 }}>✨</Text>
       <Text
         style={{
           fontSize: 18,
@@ -356,7 +369,7 @@ export default function PredictionsScreen() {
             gap: 8,
           }}
         >
-          <Brain size={32} color="#9333ea" />
+          <Text style={{ fontSize: 32, marginRight: 8 }}>🧠</Text>
           <View>
             <Text
               style={{
@@ -390,7 +403,7 @@ export default function PredictionsScreen() {
             gap: 8,
           }}
         >
-          <Sparkles size={20} color="#9333ea" />
+          <Text style={{ fontSize: 20, marginRight: 8 }}>✨</Text>
           <View style={{ flex: 1 }}>
             <Text
               style={{

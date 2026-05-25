@@ -16,6 +16,7 @@ import {
 } from 'victory-native';
 import { Asset } from '../utils/mockData';
 import { getAssetHistory, getAssetNews } from '../utils/api';
+import { addHolding } from '../utils/portfolio';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -32,6 +33,24 @@ export default function AssetDetailScreen() {
   const [chartData, setChartData] = React.useState<any[]>([]);
   const [news, setNews] = React.useState<any[]>([]);
   const [overallSentiment, setOverallSentiment] = React.useState('');
+  const [isBuying, setIsBuying] = React.useState(false);
+
+  const handleBuy = async () => {
+    setIsBuying(true);
+    try {
+      await addHolding({
+        symbol: asset.symbol,
+        amount: 1,
+        price: asset.price || 0,
+        changePercent: asset.changePercent || 0,
+      });
+      navigation.navigate('Portfolio');
+    } catch (err) {
+      console.error('Error adding to portfolio:', err);
+    } finally {
+      setIsBuying(false);
+    }
+  };
 
   React.useEffect(() => {
     const loadData = async () => {
@@ -450,25 +469,11 @@ export default function AssetDetailScreen() {
           }}
         >
           <TouchableOpacity
-            onPress={async () => {
-              try {
-                // Lazy-import to avoid cycle
-                const { addHolding } = await import('../utils/portfolio');
-                await addHolding({
-                  symbol: asset.symbol,
-                  amount: 1,
-                  price: asset.price || 0,
-                  changePercent: asset.changePercent || 0,
-                });
-                // Navigate to Portfolio to show updated holdings
-                // @ts-ignore
-                navigation.navigate('Portfolio');
-              } catch (err) {
-                console.error('Error adding to portfolio:', err);
-              }
-            }}
+            onPress={handleBuy}
+            disabled={isBuying}
             style={{
               backgroundColor: '#2563eb',
+              opacity: isBuying ? 0.7 : 1,
               borderRadius: 8,
               paddingVertical: 14,
               alignItems: 'center',
@@ -481,7 +486,7 @@ export default function AssetDetailScreen() {
                 color: '#ffffff',
               }}
             >
-              Buy {asset.symbol}
+              {isBuying ? `Adding ${asset.symbol}...` : `Buy ${asset.symbol}`}
             </Text>
           </TouchableOpacity>
         </View>

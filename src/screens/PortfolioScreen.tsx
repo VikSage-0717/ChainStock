@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
-import { Wallet, Plus, TrendingUp } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { Wallet, Plus, TrendingUp, X } from 'lucide-react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { getHoldings, sellHolding } from '../utils/portfolio';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -17,13 +21,82 @@ interface NavigationProp {
 
 export default function PortfolioScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [holdings, setHoldings] = useState<any[]>([]);
+  const [holdings, setHoldings] = React.useState<any[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [sellModalVisible, setSellModalVisible] = React.useState(false);
+  const [selectedForSell, setSelectedForSell] = React.useState<any>(null);
+  const [sellAmount, setSellAmount] = React.useState('');
 
   const totalValue = holdings.reduce((sum, item) => sum + (item.amount * item.price), 0);
   const totalGain = 0;
   const totalGainPercent = 0;
+  const isEmpty = !isLoading && holdings.length === 0;
 
-  const isEmpty = holdings.length === 0;
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+
+      const loadHoldings = async () => {
+        try {
+          const currentHoldings = await getHoldings();
+          if (isActive) {
+            setHoldings(currentHoldings);
+          }
+        } catch (error) {
+          console.error('Error loading portfolio:', error);
+          if (isActive) {
+            setHoldings([]);
+          }
+        } finally {
+          if (isActive) {
+            setIsLoading(false);
+          }
+        }
+      };
+
+      loadHoldings();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  const handleSellPress = (holding: any) => {
+    setSelectedForSell(holding);
+    setSellAmount('');
+    setSellModalVisible(true);
+  };
+
+  const handleConfirmSell = async () => {
+    if (!selectedForSell || !sellAmount) return;
+
+    const amount = parseFloat(sellAmount);
+    if (isNaN(amount) || amount <= 0 || amount > selectedForSell.amount) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount to sell');
+      return;
+    }
+
+    try {
+      const success = await sellHolding(selectedForSell.symbol, amount);
+      if (success) {
+        setSellModalVisible(false);
+        setSelectedForSell(null);
+        setSellAmount('');
+        
+        // Reload holdings
+        const updated = await getHoldings();
+        setHoldings(updated);
+        
+        Alert.alert('Success', `Sold ${amount} ${selectedForSell.symbol} shares`);
+      } else {
+        Alert.alert('Error', 'Could not complete the sale');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to sell shares');
+      console.error('Sell error:', error);
+    }
+  };
 
   const HoldingCard = ({ holding }: any) => {
     const value = holding.amount * holding.price;
@@ -73,7 +146,7 @@ export default function PortfolioScreen() {
           </Text>
         </View>
 
-        <View style={{ alignItems: 'flex-end' }}>
+        <View style={{ alignItems: 'flex-end', marginRight: 12 }}>
           <Text
             style={{
               fontSize: 16,
@@ -94,6 +167,26 @@ export default function PortfolioScreen() {
             {holding.changePercent >= 0 ? '+' : ''}{holding.changePercent.toFixed(2)}%
           </Text>
         </View>
+
+        <TouchableOpacity
+          onPress={() => handleSellPress(holding)}
+          style={{
+            backgroundColor: '#fee2e2',
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 6,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: '600',
+              color: '#dc2626',
+            }}
+          >
+            Sell
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -138,7 +231,7 @@ export default function PortfolioScreen() {
             color: '#6b7280',
           }}
         >
-          {isEmpty ? 'Your portfolio is empty' : 'Track your investments'}
+          {isLoading ? 'Loading your portfolio...' : isEmpty ? 'Your portfolio is empty' : 'Track your investments'}
         </Text>
       </View>
 
@@ -211,7 +304,43 @@ export default function PortfolioScreen() {
           )}
         </View>
 
-        {isEmpty ? (
+        {isLoading ? (
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 12,
+              padding: 40,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: '#e5e7eb',
+              borderStyle: 'dashed',
+            }}
+          >
+            <Wallet size={48} color="#d1d5db" style={{ marginBottom: 16 }} />
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                color: '#6b7280',
+                marginBottom: 8,
+                textAlign: 'center',
+              }}
+            >
+              Loading your portfolio
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: '#9ca3af',
+                textAlign: 'center',
+              }}
+            >
+              One moment while we refresh your holdings.
+            </Text>
+          </View>
+        ) : isEmpty ? (
           <>
             {/* Empty State */}
             <View
@@ -250,7 +379,7 @@ export default function PortfolioScreen() {
                 Start by buying your first asset from the market
               </Text>
               <TouchableOpacity
-                onPress={() => navigation.navigate('Dashboard')}
+                onPress={() => navigation.navigate('Home')}
                 style={{
                   backgroundColor: '#2563eb',
                   borderRadius: 8,
@@ -364,7 +493,7 @@ export default function PortfolioScreen() {
 
             {/* Action Button */}
             <TouchableOpacity
-              onPress={() => navigation.navigate('Dashboard')}
+              onPress={() => navigation.navigate('Home')}
               style={{
                 backgroundColor: '#2563eb',
                 borderRadius: 8,
@@ -395,6 +524,199 @@ export default function PortfolioScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Sell Modal */}
+      <Modal
+        visible={sellModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSellModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              padding: 20,
+              maxHeight: '80%',
+            }}
+          >
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: '700',
+                  color: '#111827',
+                }}
+              >
+                Sell {selectedForSell?.symbol}
+              </Text>
+              <TouchableOpacity onPress={() => setSellModalVisible(false)}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Available Amount */}
+            <View
+              style={{
+                backgroundColor: '#f3f4f6',
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: '#6b7280',
+                  marginBottom: 4,
+                }}
+              >
+                Available to Sell
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: '#111827',
+                }}
+              >
+                {selectedForSell?.amount.toFixed(4)} {selectedForSell?.symbol}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: '#9ca3af',
+                  marginTop: 4,
+                }}
+              >
+                Current Price: ${selectedForSell?.price.toFixed(2)}
+              </Text>
+            </View>
+
+            {/* Amount Input */}
+            <View style={{ marginBottom: 20 }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '600',
+                  color: '#111827',
+                  marginBottom: 8,
+                }}
+              >
+                Amount to Sell
+              </Text>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#e5e7eb',
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  paddingVertical: 12,
+                  fontSize: 16,
+                  color: '#111827',
+                }}
+                placeholder="Enter amount"
+                placeholderTextColor="#9ca3af"
+                keyboardType="decimal-pad"
+                value={sellAmount}
+                onChangeText={setSellAmount}
+              />
+            </View>
+
+            {/* Projected Proceeds */}
+            {sellAmount && (
+              <View
+                style={{
+                  backgroundColor: '#dcfce7',
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 20,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#166534',
+                    marginBottom: 4,
+                  }}
+                >
+                  You will receive
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: '700',
+                    color: '#166534',
+                  }}
+                >
+                  ${((parseFloat(sellAmount) || 0) * (selectedForSell?.price || 0)).toFixed(2)}
+                </Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => setSellModalVisible(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: 8,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: '#6b7280',
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmSell}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#dc2626',
+                  borderRadius: 8,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: '#ffffff',
+                  }}
+                >
+                  Confirm Sell
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
